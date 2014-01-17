@@ -42,6 +42,7 @@ import io
 import sys
 from PIL import _binary
 from PIL._util import isPath
+from uuid import UUID
 
 if str is not bytes:
     long = int
@@ -71,7 +72,7 @@ VT_VECTOR=0x1000;
 
 VT = {}
 for k, v in list(vars().items()):
-    if k[:3] == "VT_":
+    if k.startswith("VT_"):
         VT[v] = k
 
 #
@@ -103,18 +104,17 @@ class _OleStream(io.BytesIO):
 
     def __init__(self, fp, sect, size, offset, sectorsize, fat):
 
-        data = []
+        io.BytesIO.__init__(self)
 
         while sect != -2: # 0xFFFFFFFEL:
             fp.seek(offset + sectorsize * sect)
-            data.append(fp.read(sectorsize))
+            self.write(fp.read(sectorsize))
             sect = fat[sect]
 
-        data = b"".join(data)
+        # print(self.tell(), size)
 
-        # print(len(data), size)
-
-        io.BytesIO.__init__(self, data[:size])
+        self.truncate(size)
+        self.seek(0)
 
 #
 # --------------------------------------------------------------------
@@ -370,9 +370,7 @@ class OleFileIO:
     def _clsid(self, clsid):
         if not clsid.strip(b"\0"):
             return ""
-        return (("%08X-%04X-%04X-%02X%02X-" + "%02X" * 6) %
-                ((i32(clsid, 0), i16(clsid, 4), i16(clsid, 6)) +
-                tuple(map(i8, clsid[8:16]))))
+        return str(UUID(bytes_le=clsid))
 
     def _list(self, files, prefix, node):
         # listdir helper
